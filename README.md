@@ -17,9 +17,15 @@ A sophisticated chatbot system that orchestrates multiple LLM models using LangG
                        ┌─────────────────┐    ┌─────────────────┐
                        │   Ollama Models │    │  Response       │
                        │                 │    │  Synthesis      │
-                       │  - Model 1      │    │                 │
-                       │  - Model 2      │───►│  - Combine      │
-                       │  - Model 3      │    │  - Refine       │
+                       │                 │    │                 │
+                       │  Router         │───►│  Aggregator    │
+                       │  (mistral:7b)   │    │  (mistral:7b)  │
+                       │                 │    │                 │
+                       │  Expert A       │    │  - Combine      │
+                       │  (finance-llama)│    │  - Refine       │
+                       │                 │    │  - Structure    │
+                       │  Expert B       │    │                 │
+                       │  (llama3.1:8b)  │    │                 │
                        └─────────────────┘    └─────────────────┘
 ```
 
@@ -48,10 +54,47 @@ A sophisticated chatbot system that orchestrates multiple LLM models using LangG
 
 1. **User Input** → React frontend captures user query
 2. **Backend Processing** → Python backend receives and validates request
-3. **LLM Orchestration** → LangGraph routes query to two specialized LLM models
-4. **Parallel Processing** → Both models process query simultaneously
-5. **Response Synthesis** → Third LLM combines and refines responses
-6. **Final Output** → Synthesized response returned to user
+3. **Router Decision** → mistral:7b analyzes query and routes to appropriate expert(s)
+4. **Expert Processing** → Specialized models process query in parallel:
+   - **Expert A** (finance-llama-8b): Handles finance fundamentals, sentiment, sector context
+   - **Expert B** (llama3.1:8b): Manages mathematical reasoning, coding snippets, explanations
+5. **Response Aggregation** → mistral:7b combines expert responses into structured answer
+6. **Final Output** → Synthesized, coherent response returned to user
+
+## 🧠 Model Architecture
+
+### Router (mistral:7b)
+- **Purpose**: Query classification and routing
+- **Function**: Determines if query is "finance-specific" vs "general"
+- **Speed**: Fast inference for quick routing decisions
+- **Output**: Routing decision to appropriate expert(s)
+
+### Expert A (martain7r/finance-llama-8b)
+- **Specialization**: Finance domain expertise
+- **Capabilities**: 
+  - Financial fundamentals and concepts
+  - Market sentiment analysis
+  - Sector-specific context and insights
+  - Investment terminology and explanations
+- **Use Cases**: Stock analysis, market trends, financial planning
+
+### Expert B (llama3.1:8b)
+- **Specialization**: General reasoning and technical tasks
+- **Capabilities**:
+  - Mathematical reasoning and calculations
+  - Code generation (especially pandas, data analysis)
+  - Logical explanations and step-by-step reasoning
+  - General knowledge and problem-solving
+- **Use Cases**: Data analysis, coding help, mathematical problems
+
+### Aggregator (mistral:7b)
+- **Purpose**: Response synthesis and refinement
+- **Function**: Combines expert outputs into coherent, structured answer
+- **Capabilities**:
+  - Eliminates redundancy and contradictions
+  - Ensures logical flow and consistency
+  - Formats response for optimal user experience
+  - Maintains context and relevance
 
 ## 📁 Project Structure
 
@@ -139,9 +182,9 @@ npm install
 npm run dev
 
 # Start Ollama models
-ollama run llama2
-ollama run mistral
-ollama run codellama
+ollama run mistral:7b          # Router and Aggregator
+ollama run martain7r/finance-llama-8b  # Expert A (Finance)
+ollama run llama3.1:8b         # Expert B (General/Technical)
 ```
 
 ## 🔍 Key Features
