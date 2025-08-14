@@ -20,8 +20,8 @@ body {
 }
 
 .app-header {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
+  background: #f0f0f0;
+  color: #333;
   padding: 1rem 2rem;
   display: flex;
   justify-content: space-between;
