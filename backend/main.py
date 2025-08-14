@@ -7,9 +7,12 @@ import httpx
 import os
 from dotenv import load_dotenv
 
+# Import simplified multi-model system
+from simple_multi_model import run_multi_model_query
+
 load_dotenv()
 
-app = FastAPI(title="AI Agent MVP", version="0.1.0")
+app = FastAPI(title="AI Agent MVP - Multi-Model Enhanced", version="0.2.0")
 
 # CORS middleware for frontend communication
 app.add_middleware(
@@ -42,7 +45,7 @@ OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 DEFAULT_MODEL = os.getenv("DEFAULT_MODEL", "mistral:7b")
 
 async def stream_ollama_response(prompt: str, model: str = DEFAULT_MODEL):
-    """Stream response from Ollama model"""
+    """Stream response from Ollama model (fallback)"""
     async with httpx.AsyncClient() as client:
         response = await client.post(
             f"{OLLAMA_BASE_URL}/api/generate",
@@ -67,11 +70,11 @@ async def stream_ollama_response(prompt: str, model: str = DEFAULT_MODEL):
 
 @app.get("/")
 async def root():
-    return {"message": "AI Agent MVP - Backend Running"}
+    return {"message": "AI Agent MVP - Multi-Model Enhanced Backend Running"}
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy", "model": DEFAULT_MODEL}
+    return {"status": "healthy", "model": DEFAULT_MODEL, "system": "multi-model"}
 
 @app.websocket("/ws/chat")
 async def websocket_endpoint(websocket: WebSocket):
@@ -87,37 +90,77 @@ async def websocket_endpoint(websocket: WebSocket):
             await manager.send_personal_message(
                 json.dumps({
                     "type": "status",
-                    "content": "Processing your request...",
+                    "content": "Processing with multi-model system...",
                     "timestamp": asyncio.get_event_loop().time()
                 }),
                 websocket
             )
             
-            # Stream response from Ollama
-            full_response = ""
-            async for chunk in stream_ollama_response(user_message):
-                full_response += chunk
-                # Send chunk to client
+            # Run multi-model system
+            try:
+                # Execute multi-model processing
+                result = await run_multi_model_query(user_message)
+                
+                # Stream the final response
+                final_response = result.get("final_response", "No response generated")
+                words = final_response.split()
+                
+                for word in words:
+                    await manager.send_personal_message(
+                        json.dumps({
+                            "type": "chunk",
+                            "content": word + " ",
+                            "timestamp": asyncio.get_event_loop().time()
+                        }),
+                        websocket
+                    )
+                    await asyncio.sleep(0.05)  # Slower streaming for readability
+                
+                # Send completion signal
                 await manager.send_personal_message(
                     json.dumps({
-                        "type": "chunk",
-                        "content": chunk,
+                        "type": "complete",
+                        "content": final_response,
                         "timestamp": asyncio.get_event_loop().time()
                     }),
                     websocket
                 )
-                # Small delay to make streaming visible
-                await asyncio.sleep(0.01)
-            
-            # Send completion signal
-            await manager.send_personal_message(
-                json.dumps({
-                    "type": "complete",
-                    "content": full_response,
-                    "timestamp": asyncio.get_event_loop().time()
-                }),
-                websocket
-            )
+                
+            except Exception as e:
+                print(f"Multi-model system error: {e}")
+                # Fallback to simple streaming
+                await manager.send_personal_message(
+                    json.dumps({
+                        "type": "status",
+                        "content": "Falling back to single model...",
+                        "timestamp": asyncio.get_event_loop().time()
+                    }),
+                    websocket
+                )
+                
+                # Fallback streaming
+                full_response = ""
+                async for chunk in stream_ollama_response(user_message):
+                    full_response += chunk
+                    await manager.send_personal_message(
+                        json.dumps({
+                            "type": "chunk",
+                            "content": chunk,
+                            "timestamp": asyncio.get_event_loop().time()
+                        }),
+                        websocket
+                    )
+                    await asyncio.sleep(0.01)
+                
+                # Send completion
+                await manager.send_personal_message(
+                    json.dumps({
+                        "type": "complete",
+                        "content": full_response,
+                        "timestamp": asyncio.get_event_loop().time()
+                    }),
+                    websocket
+                )
             
     except WebSocketDisconnect:
         manager.disconnect(websocket)
